@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+import logging
 from sklearn.model_selection import cross_val_score, train_test_split, learning_curve, StratifiedKFold
 from sklearn.metrics import (
     classification_report,
@@ -14,21 +15,54 @@ from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
 from sklearn.linear_model import LogisticRegression
 
-# === Setup output folder ===
+# === Setup logging and output folder ===
 OUTPUT_FOLDER = "output"
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+# === Helper Plot Functions ===
+def save_plot(filename):
+    plt.tight_layout()
+    plt.savefig(os.path.join(OUTPUT_FOLDER, filename))
+
+def plot_learning_curve(model, X, y, title, filename):
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    train_sizes, train_scores, val_scores = learning_curve(model, X, y, cv=cv, scoring='f1', n_jobs=-1, train_sizes=np.linspace(0.1, 1.0, 10))
+    plt.figure(figsize=(8, 5))
+    plt.plot(train_sizes, np.mean(train_scores, axis=1), 'o-', label='Training F1')
+    plt.plot(train_sizes, np.mean(val_scores, axis=1), 'o-', label='Validation F1')
+    plt.title(title)
+    plt.xlabel("Training Set Size")
+    plt.ylabel("F1 Score")
+    plt.grid(True)
+    plt.legend()
+    save_plot(filename)
+
+def plot_roc_curve(model, X_test, y_test, title="ROC Curve", filename=None):
+    y_score = model.predict_proba(X_test)[:, 1]
+    fpr, tpr, _ = roc_curve(y_test, y_score)
+    roc_auc = auc(fpr, tpr)
+    plt.figure(figsize=(6, 5))
+    plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (AUC = {roc_auc:.2f})')
+    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title(title)
+    plt.legend(loc="lower right")
+    if filename:
+        save_plot(filename)
 
 # === Logistic Regression (Scikit-learn) ===
 def train_logistic_regression(X, y):
-    print("\n=== Logistic Regression (sklearn) ===")
+    logging.info("Training Logistic Regression (sklearn)")
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
     model = LogisticRegression(max_iter=1000)
     model.fit(X_train, y_train)
     y_pred = model.predict(X_test)
 
-    print(classification_report(y_test, y_pred))
+    logging.info(classification_report(y_test, y_pred))
     cm = confusion_matrix(y_test, y_pred)
-    print(cm)
+    logging.info(f"Confusion Matrix:\n{cm}")
     ConfusionMatrixDisplay(confusion_matrix=cm).plot(cmap='Blues')
     plt.title("Logistic Regression (sklearn) Confusion Matrix")
     save_plot("confusion_logistic_sklearn.png")
@@ -36,7 +70,7 @@ def train_logistic_regression(X, y):
     plot_roc_curve(model, X_test, y_test, title="Logistic Regression ROC Curve", filename="roc_logistic_regression.png")
     plot_learning_curve(model, X, y, title="Learning Curve - Logistic Regression (sklearn)", filename="learning_curve_logistic_sklearn.png")
 
-# === Logistic Regression (Manual Gradient Descent) ===
+# === Logistic Regression (Manual GD) ===
 def sigmoid(z):
     return 1 / (1 + np.exp(-z))
 
@@ -63,14 +97,14 @@ def predict_gd(X, weights):
     return (sigmoid(np.dot(X, weights)) >= 0.5).astype(int)
 
 def train_logistic_regression_from_scratch(X, y):
-    print("\n=== Logistic Regression (Gradient Descent) ===")
+    logging.info("Training Logistic Regression (Gradient Descent)")
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
     weights, loss_history = logistic_regression_gd(X_train, y_train, lr=0.1, epochs=1000, reg_lambda=0.1)
     y_pred = predict_gd(X_test, weights)
 
-    print(classification_report(y_test, y_pred))
+    logging.info(classification_report(y_test, y_pred))
     cm = confusion_matrix(y_test, y_pred)
-    print(cm)
+    logging.info(f"Confusion Matrix:\n{cm}")
     ConfusionMatrixDisplay(confusion_matrix=cm).plot(cmap='Blues')
     plt.title("Logistic Regression (Gradient Descent) Confusion Matrix")
     save_plot("confusion_logistic_gradient_descent.png")
@@ -85,17 +119,19 @@ def train_logistic_regression_from_scratch(X, y):
     save_plot("loss_logistic_gradient_descent.png")
 
     model = LogisticRegression(max_iter=1000)
-    plot_learning_curve(model, X, y, title="Learning Curve - Logistic Regression  (Gradient Descent)", filename="learning_curve_logistic_regression.png")
+    plot_learning_curve(model, X, y, title="Learning Curve - Logistic Regression (Gradient Descent)", filename="learning_curve_logistic_regression.png")
 
 # === Decision Tree ===
 def train_decision_tree(X, y):
-    print("\n--- Decision Tree ---")
+    logging.info("Training Decision Tree")
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
     model = DecisionTreeClassifier(max_depth=10, random_state=42)
     model.fit(X_train, y_train)
     y_pred = model.predict(X_test)
-    print(classification_report(y_test, y_pred))
+
+    logging.info(classification_report(y_test, y_pred))
     cm = confusion_matrix(y_test, y_pred)
+    logging.info(f"Confusion Matrix:\n{cm}")
     ConfusionMatrixDisplay(confusion_matrix=cm).plot(cmap='Blues')
     plt.title("Decision Tree Confusion Matrix")
     save_plot("confusion_decision_tree.png")
@@ -105,13 +141,15 @@ def train_decision_tree(X, y):
 
 # === Random Forest ===
 def train_random_forest(X, y, feature_names):
-    print("\n--- Random Forest ---")
+    logging.info("Training Random Forest")
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
     model = RandomForestClassifier(n_estimators=100, max_depth=15, random_state=42)
     model.fit(X_train, y_train)
     y_pred = model.predict(X_test)
-    print(classification_report(y_test, y_pred))
+
+    logging.info(classification_report(y_test, y_pred))
     cm = confusion_matrix(y_test, y_pred)
+    logging.info(f"Confusion Matrix:\n{cm}")
     ConfusionMatrixDisplay(confusion_matrix=cm).plot(cmap='Blues')
     plt.title("Random Forest Confusion Matrix")
     save_plot("confusion_random_forest.png")
@@ -130,13 +168,15 @@ def train_random_forest(X, y, feature_names):
 
 # === XGBoost ===
 def train_xgboost(X, y, feature_names):
-    print("\n--- XGBoost ---")
+    logging.info("Training XGBoost")
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
     model = XGBClassifier(use_label_encoder=False, eval_metric='logloss')
     model.fit(X_train, y_train)
     y_pred = model.predict(X_test)
-    print(classification_report(y_test, y_pred))
+
+    logging.info(classification_report(y_test, y_pred))
     cm = confusion_matrix(y_test, y_pred)
+    logging.info(f"Confusion Matrix:\n{cm}")
     ConfusionMatrixDisplay(confusion_matrix=cm).plot(cmap='Blues')
     plt.title("XGBoost Confusion Matrix")
     save_plot("confusion_XGBoost.png")
@@ -152,36 +192,3 @@ def train_xgboost(X, y, feature_names):
     plt.xlabel('Relative Importance')
     plt.title('Top 10 Feature Importances (XGBoost)')
     save_plot("importance_feature_XGBoost.png")
-
-def save_plot(filename):
-    plt.tight_layout()
-    plt.savefig(os.path.join(OUTPUT_FOLDER, filename))
-    plt.show()
-
-def plot_learning_curve(model, X, y, title, filename):
-    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-    train_sizes, train_scores, val_scores = learning_curve(model, X, y, cv=cv, scoring='f1', n_jobs=-1, train_sizes=np.linspace(0.1, 1.0, 10))
-    plt.figure(figsize=(8, 5))
-    plt.plot(train_sizes, np.mean(train_scores, axis=1), 'o-', label='Training F1')
-    plt.plot(train_sizes, np.mean(val_scores, axis=1), 'o-', label='Validation F1')
-    plt.title(title)
-    plt.xlabel("Training Set Size")
-    plt.ylabel("F1 Score")
-    plt.grid(True)
-    plt.legend()
-    save_plot(filename)
-
-# === ROC Utility ===
-def plot_roc_curve(model, X_test, y_test, title="ROC Curve", filename=None):
-    y_score = model.predict_proba(X_test)[:, 1]
-    fpr, tpr, _ = roc_curve(y_test, y_score)
-    roc_auc = auc(fpr, tpr)
-    plt.figure(figsize=(6, 5))
-    plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (AUC = {roc_auc:.2f})')
-    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title(title)
-    plt.legend(loc="lower right")
-    if filename:
-        save_plot(filename)
