@@ -10,13 +10,14 @@ It is structured for **Docker-based execution**, using a simple `Makefile` to tr
 ## 📂 Project Structure
 
 ```
-📁 data/                  # Input data folder (e.g., friday_afternoon.csv)
-📁 output/                # Output plots, logs, saved models
-📄 supervised.py          # Supervised ML models (logistic, RF, XGBoost, etc.)
-📄 neural_network.py      # Deep learning models (ReLU, tanh variants)
-📄 unsupervised_anomaly.py# KMeans & Gaussian anomaly detection
-📄 preprocessing.py       # Data cleaning and standardization
-📄 runner.py              # Main execution point (CLI)
+📁 data/                     # Input data folder (e.g., friday_afternoon.csv)
+📁 output/                   # Output plots, logs, saved models
+📄 supervised.py             # Supervised ML models (logistic, RF, XGBoost, etc.)
+📄 neural_network.py         # Deep learning models (ReLU, tanh variants)
+📄 unsupervised_anomaly.py   # KMeans & Gaussian anomaly detection
+📄 preprocessing.py          # Data cleaning and standardization
+📄 runner.py                 # Main execution point (CLI)
+📄 cyber_threat_detection.ipynb 
 📄 requirements.txt
 📄 Dockerfile
 📄 Makefile
@@ -72,8 +73,13 @@ pip install -r requirements.txt
 python runner.py --model neural
 ```
 
-> Be sure your Python version is 3.10+  
-> Output will still go to `output/`
+### 4️⃣ Run Jupyter Notebook
+
+Use the full visual notebook with plots, metrics, and model results:
+
+```bash
+jupyter notebook cyber_threat_detection.ipynb
+```
 
 ---
 
@@ -118,7 +124,3 @@ Each model is evaluated using:
 - **PCA Visualization** (for clustering & anomaly)
 
 ---
-
-## 📜 License
-
-This project is for academic and educational purposes under [MIT License](LICENSE).
