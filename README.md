@@ -27,7 +27,7 @@ It is structured for **Docker-based execution**, using a simple `Makefile` to tr
 
 ## 🚀 How to Run This Project
 
-You can run this project in **three different ways**:
+You can run this project in **four different ways**:
 
 ---
 
